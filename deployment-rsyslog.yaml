@@ -1,0 +1,141 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  creationTimestamp: 2019-01-15T16:08:11Z
+  generation: 1
+  labels:
+    app: rsyslog
+  name: rsyslog
+  namespace: default
+  resourceVersion: "10988361"
+  selfLink: /apis/extensions/v1beta1/namespaces/default/deployments/rsyslog
+  uid: c17fca3e-18df-11e9-b697-2ed92bf8f90b
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: rsyslog
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: rsyslog
+      name: rsyslog
+    spec:
+      containers:
+      - image: voxxit/rsyslog:latest
+        args: ["-f","/rsyslog-config/rsyslog.conf"]
+        imagePullPolicy: Always
+        name: rsyslog
+        ports:
+        - containerPort: 514
+          name: incoming-logs
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /var/log/
+          name: rsyslog-k8s
+        - mountPath: /rsyslog-config/
+          name: rsyslog-config
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        runAsUser: 0
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 30
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: rsyslog
+        name: rsyslog-config
+      - name: rsyslog-k8s
+        persistentVolumeClaim:
+          claimName: rsyslog-service
+---
+apiVersion: v1
+data:
+  rsyslog.conf: |
+    #  /etc/rsyslog.conf	Configuration file for rsyslog.
+    #
+    #			For more information see
+    #			/usr/share/doc/rsyslog-doc/html/rsyslog_conf.html
+    #
+    #  Default logging rules can be found in /etc/rsyslog.d/50-default.conf
+    
+    
+    #################
+    #### MODULES ####
+    #################
+    
+    module(load="imuxsock") # provides support for local system logging
+    #module(load="immark")  # provides --MARK-- message capability
+    
+    # provides UDP syslog reception
+    module(load="imudp")
+    input(type="imudp" port="514")
+    
+    # provides TCP syslog reception
+    module(load="imtcp")
+    input(type="imtcp" port="514")
+    
+    # provides kernel logging support and enable non-kernel klog messages
+    #module(load="imklog" permitnonkernelfacility="on")
+    
+    ###########################
+    #### GLOBAL DIRECTIVES ####
+    ###########################
+    
+    #
+    # Use traditional timestamp format.
+    # To enable high precision timestamps, comment out the following line.
+    #
+    #$ActionFileDefaultTemplate RSYSLOG_TraditionalFileFormat
+    
+    # Filter duplicated messages
+    #$RepeatedMsgReduction on
+    
+    
+    #
+    # Where to place spool and state files
+    #
+    #$WorkDirectory /var/spool/rsyslog
+    
+    #
+    # Include all config files in /etc/rsyslog.d/
+    #
+    #$IncludeConfig /etc/rsyslog.d/*.conf
+    *.* action(type="omfile" file="/var/log/kubernetes.log")
+     
+kind: ConfigMap
+metadata:
+  name: rsyslog
+  namespace: default
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rsyslog-service
+spec:
+  selector:
+    app: rsyslog
+  type: ClusterIP  
+  ports:
+  - name: tcp-syslog
+    port: 514
+    targetPort: 514
+    protocol: TCP
